@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<title>Imprint FX — banc de test</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background:#14171c; color:#eef2f5; font-family:"Segoe UI",sans-serif; overflow:hidden; }
+  #cv { display:block; cursor:crosshair; }
+  #panel {
+    position:fixed; top:12px; left:12px; width:250px; background:rgba(18,22,28,.94);
+    border:1px solid #2c3543; border-radius:12px; padding:12px; z-index:10; font-size:12px;
+  }
+  #panel label { display:flex; justify-content:space-between; margin:7px 0 2px; color:#9aa6b2; }
+  #panel input[type=range] { width:100%; }
+  #panel .val { color:#4fd16b; font-weight:600; }
+  #panel h3 { font-size:13px; margin-bottom:4px; }
+  #panel .row { display:flex; gap:6px; margin-top:8px; }
+  #panel button { flex:1; padding:6px; border-radius:8px; border:1px solid #3a4452; background:#252c38; color:#eef2f5; cursor:pointer; font-size:12px; }
+  #panel button.on { outline:2px solid #4fd16b; }
+  #hint { position:fixed; bottom:10px; left:50%; transform:translateX(-50%); background:rgba(18,22,28,.85); padding:6px 14px; border-radius:999px; font-size:12px; color:#9aa6b2; z-index:10; }
+</style>
+</head>
+<body>
+<canvas id="cv"></canvas>
+<div id="panel">
+  <h3>🫥 Empreinte — réglages</h3>
+  <label>Taille perso (px) <span class="val" id="v-scale"></span></label>
+  <input type="range" id="p-scale" min="60" max="400" value="170" />
+  <label>Ombre contact α <span class="val" id="v-oa"></span></label>
+  <input type="range" id="p-oa" min="0" max="100" value="38" />
+  <label>Ombre contact flou <span class="val" id="v-ob"></span></label>
+  <input type="range" id="p-ob" min="0" max="30" value="7" />
+  <label>Ombre contact décalage <span class="val" id="v-od"></span></label>
+  <input type="range" id="p-od" min="0" max="20" value="5" />
+  <label>Liseré sombre bas (interne) <span class="val" id="v-ia"></span></label>
+  <input type="range" id="p-ia" min="0" max="100" value="30" />
+  <label>Épaisseur liseré <span class="val" id="v-ie"></span></label>
+  <input type="range" id="p-ie" min="1" max="16" value="5" />
+  <label>Liseré lumineux haut <span class="val" id="v-ta"></span></label>
+  <input type="range" id="p-ta" min="0" max="100" value="22" />
+  <label>Voile interne (assombrit) <span class="val" id="v-in"></span></label>
+  <input type="range" id="p-in" min="0" max="30" value="5" />
+  <label>Rotation (°) <span class="val" id="v-rot"></span></label>
+  <input type="range" id="p-rot" min="-180" max="180" value="0" />
+  <div class="row">
+    <button id="b-ghost">Contour debug</button>
+    <button id="b-loupe" class="on">Loupe</button>
+  </div>
+  <div class="row">
+    <button data-preset="easy">Facile</button>
+    <button data-preset="med">Moyen</button>
+    <button data-preset="hard">Difficile</button>
+  </div>
+</div>
+<div id="hint">Clique pour placer le mannequin · les réglages s'appliquent en direct</div>
+
+<script>
+const cv = document.getElementById("cv");
+const ctx = cv.getContext("2d");
+let W, H;
+const scene = new Image();
+scene.src = "/scenes/meadow-fish-clouds.webp";
+
+const P = {
+  scale: 170, oa: .38, ob: 7, od: 5, ia: .30, ie: 5, ta: .22, inn: .05, rot: 0,
+  ghost: false, loupe: true,
+};
+let pos = { x: 0.35, y: 0.75 }; // fraction de l'écran
+
+// ---------------------------------------------------------------------------
+// Silhouette mannequin (vu de face, debout) — dessinée dans un carré size×size,
+// personnage centré, hauteur = size. Formes arrondies façon figurine lisse.
+// ---------------------------------------------------------------------------
+function capsule(c, x1, y1, x2, y2, r) {
+  const a = Math.atan2(y2 - y1, x2 - x1);
+  c.beginPath();
+  c.arc(x1, y1, r, a + Math.PI / 2, a - Math.PI / 2);
+  c.arc(x2, y2, r, a - Math.PI / 2, a + Math.PI / 2);
+  c.closePath();
+  c.fill();
+}
+function drawMannequin(c, s) {
+  const cx = s / 2;
+  c.fillStyle = "#fff";
+  // tête (ovale légèrement allongé)
+  c.beginPath(); c.ellipse(cx, s * .13, s * .105, s * .125, 0, 0, 7); c.fill();
+  // cou
+  capsule(c, cx, s * .23, cx, s * .28, s * .05);
+  // torse : épaules arrondies -> hanches
+  c.beginPath(); c.ellipse(cx, s * .315, s * .155, s * .075, 0, 0, 7); c.fill(); // épaules
+  c.beginPath();
+  c.moveTo(cx - s * .155, s * .315);
+  c.bezierCurveTo(cx - s * .165, s * .45, cx - s * .135, s * .52, cx - s * .125, s * .565);
+  c.lineTo(cx + s * .125, s * .565);
+  c.bezierCurveTo(cx + s * .135, s * .52, cx + s * .165, s * .45, cx + s * .155, s * .315);
+  c.closePath(); c.fill();
+  c.beginPath(); c.ellipse(cx, s * .565, s * .125, s * .06, 0, 0, 7); c.fill(); // bassin
+  // bras (légèrement écartés, mains à mi-cuisse)
+  capsule(c, cx - s * .19, s * .33, cx - s * .225, s * .60, s * .048);
+  capsule(c, cx + s * .19, s * .33, cx + s * .225, s * .60, s * .048);
+  // jambes (léger écart)
+  capsule(c, cx - s * .062, s * .60, cx - s * .068, s * .945, s * .062);
+  capsule(c, cx + s * .062, s * .60, cx + s * .068, s * .945, s * .062);
+}
+
+// masque offscreen (haute résolution fixe, redimensionné au rendu)
+const MS = 512;
+const mask = document.createElement("canvas");
+mask.width = mask.height = MS;
+drawMannequin(mask.getContext("2d"), MS);
+
+// masque décalé soustrait -> liseré (rim). dir=+1 : rim bas ; -1 : rim haut
+function rimMask(offsetFrac, dir) {
+  const c = document.createElement("canvas");
+  c.width = c.height = MS;
+  const x = c.getContext("2d");
+  x.drawImage(mask, 0, 0);
+  x.globalCompositeOperation = "destination-out";
+  x.drawImage(mask, 0, -dir * offsetFrac * MS);
+  return c;
+}
+// ombre externe : masque flouté moins le masque net (ombre seulement autour),
+// pondérée par un gradient vertical : lumière venant du haut, l'ombre pèse en bas
+// (sinon halo uniforme autour de la tête = effet "autocollant")
+function outerShadowMask(blurFrac, dyFrac) {
+  const c = document.createElement("canvas");
+  c.width = c.height = MS;
+  const x = c.getContext("2d");
+  x.filter = `blur(${blurFrac * MS}px)`;
+  x.drawImage(mask, 0, dyFrac * MS);
+  x.filter = "none";
+  x.globalCompositeOperation = "destination-out";
+  x.drawImage(mask, 0, 0);
+  x.globalCompositeOperation = "destination-in";
+  const g = x.createLinearGradient(0, 0, 0, MS);
+  g.addColorStop(0, "rgba(0,0,0,0.08)");
+  g.addColorStop(0.45, "rgba(0,0,0,0.40)");
+  g.addColorStop(0.8, "rgba(0,0,0,1)");
+  x.fillStyle = g;
+  x.fillRect(0, 0, MS, MS);
+  return c;
+}
+function tinted(src, color) {
+  const c = document.createElement("canvas");
+  c.width = c.height = MS;
+  const x = c.getContext("2d");
+  x.drawImage(src, 0, 0);
+  x.globalCompositeOperation = "source-in";
+  x.fillStyle = color;
+  x.fillRect(0, 0, MS, MS);
+  return c;
+}
+
+// ---------------------------------------------------------------------------
+// Rendu de l'empreinte : la texture du fond CONTINUE (on ne dessine aucun aplat),
+// seuls des calques d'ombre/lumière trahissent la silhouette.
+// ---------------------------------------------------------------------------
+function drawImprint(c, x, y, size, p) {
+  c.save();
+  c.translate(x, y);
+  c.rotate(p.rot * Math.PI / 180);
+  c.translate(-size / 2, -size / 2);
+
+  // 1. ombre de contact externe (multiply, sous les pieds/contours bas)
+  const osm = tinted(outerShadowMask(p.ob / 512, p.od / 512 * 3), "#2c2418");
+  c.globalCompositeOperation = "multiply";
+  c.globalAlpha = p.oa;
+  c.drawImage(osm, 0, 0, size, size);
+
+  // 2. liseré sombre interne en bas (occlusion au sol)
+  const dark = tinted(rimMask(p.ie / 512 * 3, +1), "#33291c");
+  c.globalAlpha = p.ia;
+  c.drawImage(dark, 0, 0, size, size);
+
+  // 3. voile interne très léger (le corps "presse" la texture)
+  const veil = tinted(mask, "#241f16");
+  c.globalAlpha = p.inn;
+  c.drawImage(veil, 0, 0, size, size);
+
+  // 4. liseré lumineux en haut (screen)
+  const lite = tinted(rimMask(p.ie / 512 * 2.2, -1), "#fffbe8");
+  c.globalCompositeOperation = "screen";
+  c.globalAlpha = p.ta;
+  c.drawImage(lite, 0, 0, size, size);
+
+  c.globalCompositeOperation = "source-over";
+  c.globalAlpha = 1;
+  if (p.ghost) {
+    c.strokeStyle = "rgba(255,60,60,.8)";
+    c.lineWidth = 1.5;
+    c.strokeRect(0, 0, size, size);
+  }
+  c.restore();
+}
+
+function render() {
+  W = cv.width = innerWidth;
+  H = cv.height = innerHeight;
+  if (!scene.complete) return;
+  // cover
+  const sc = Math.max(W / scene.width, H / scene.height);
+  const dw = scene.width * sc, dh = scene.height * sc;
+  ctx.drawImage(scene, (W - dw) / 2, (H - dh) / 2, dw, dh);
+
+  const x = pos.x * W, y = pos.y * H;
+  drawImprint(ctx, x, y, P.scale, P);
+
+  // loupe ×3
+  if (P.loupe) {
+    const LS = 260, Z = 3;
+    const lx = W - LS - 14, ly = 14;
+    ctx.save();
+    ctx.beginPath(); ctx.rect(lx, ly, LS, LS); ctx.clip();
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(cv, x - LS / (2 * Z), y - LS / (2 * Z), LS / Z, LS / Z, lx, ly, LS, LS);
+    ctx.restore();
+    ctx.strokeStyle = "#4fd16b"; ctx.lineWidth = 2;
+    ctx.strokeRect(lx, ly, LS, LS);
+    ctx.fillStyle = "#4fd16b"; ctx.font = "12px sans-serif";
+    ctx.fillText("loupe ×3", lx + 8, ly + LS - 8);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// UI
+// ---------------------------------------------------------------------------
+const binds = [
+  ["p-scale", "v-scale", (v) => (P.scale = +v), () => P.scale],
+  ["p-oa", "v-oa", (v) => (P.oa = v / 100), () => P.oa.toFixed(2)],
+  ["p-ob", "v-ob", (v) => (P.ob = +v), () => P.ob],
+  ["p-od", "v-od", (v) => (P.od = +v), () => P.od],
+  ["p-ia", "v-ia", (v) => (P.ia = v / 100), () => P.ia.toFixed(2)],
+  ["p-ie", "v-ie", (v) => (P.ie = +v), () => P.ie],
+  ["p-ta", "v-ta", (v) => (P.ta = v / 100), () => P.ta.toFixed(2)],
+  ["p-in", "v-in", (v) => (P.inn = v / 100), () => P.inn.toFixed(2)],
+  ["p-rot", "v-rot", (v) => (P.rot = +v), () => P.rot],
+];
+for (const [pid, vid, set, get] of binds) {
+  const inp = document.getElementById(pid);
+  const lab = document.getElementById(vid);
+  const sync = () => { set(inp.value); lab.textContent = get(); render(); };
+  inp.addEventListener("input", sync);
+  set(inp.value); lab.textContent = get();
+}
+document.getElementById("b-ghost").onclick = (e) => { P.ghost = !P.ghost; e.target.classList.toggle("on", P.ghost); render(); };
+document.getElementById("b-loupe").onclick = (e) => { P.loupe = !P.loupe; e.target.classList.toggle("on", P.loupe); render(); };
+const PRESETS = {
+  easy: { oa: .5, ob: 5, od: 6, ia: .4, ie: 6, ta: .3, inn: .09 },
+  med:  { oa: .38, ob: 7, od: 5, ia: .3, ie: 5, ta: .22, inn: .05 },
+  hard: { oa: .26, ob: 9, od: 4, ia: .2, ie: 4, ta: .13, inn: .03 },
+};
+document.querySelectorAll("[data-preset]").forEach((b) => {
+  b.onclick = () => {
+    Object.assign(P, PRESETS[b.dataset.preset]);
+    for (const [pid, vid, set, get] of binds) {
+      const el = document.getElementById(pid);
+      if (pid === "p-oa") el.value = P.oa * 100;
+      if (pid === "p-ob") el.value = P.ob;
+      if (pid === "p-od") el.value = P.od;
+      if (pid === "p-ia") el.value = P.ia * 100;
+      if (pid === "p-ie") el.value = P.ie;
+      if (pid === "p-ta") el.value = P.ta * 100;
+      if (pid === "p-in") el.value = P.inn * 100;
+      document.getElementById(vid).textContent = get();
+    }
+    render();
+  };
+});
+cv.addEventListener("mousedown", (e) => { pos = { x: e.clientX / W, y: e.clientY / H }; render(); });
+addEventListener("resize", render);
+scene.onload = render;
+</script>
+</body>
+</html>

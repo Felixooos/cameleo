@@ -1,0 +1,19 @@
+{
+  "name": "mecha-cameleo",
+  "version": "0.1.0",
+  "description": "Prototype .io - 10 cacheurs camouflés vs 1 chasseur, sur une map vectorielle type tapis d'enfant.",
+  "type": "commonjs",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node test/smoke.js"
+  },
+  "dependencies": {
+    "@napi-rs/canvas": "^1.0.2",
+    "express": "^4.19.2",
+    "socket.io": "^4.7.5"
+  },
+  "devDependencies": {
+    "socket.io-client": "^4.7.5"
+  }
+}

@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Mecha Cameleo</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+
+  <!-- ===================== MENU ===================== -->
+  <section id="screen-menu" class="screen active">
+    <div class="menu-card">
+      <h1 class="logo">MECHA <span>CAMELEO</span></h1>
+      <p class="tagline">10 caméléons se camouflent. 1 chasseur les traque. Fonds-toi dans le décor.</p>
+
+      <label class="field">
+        <span>Ton pseudo</span>
+        <input id="inp-name" maxlength="16" placeholder="Caméléon123" />
+      </label>
+
+      <div class="menu-cols">
+        <div class="menu-col">
+          <h3>Créer une partie</h3>
+          <label class="field">
+            <span>Mode</span>
+            <select id="inp-mode">
+              <option value="photo">📸 Cache-cache photo (tour par tour)</option>
+              <option value="normal">Normal (élimination définitive)</option>
+              <option value="infected">Infecté (le mort devient chasseur)</option>
+            </select>
+          </label>
+          <button id="btn-create" class="btn primary">Héberger</button>
+        </div>
+
+        <div class="menu-col">
+          <h3>Rejoindre</h3>
+          <label class="field">
+            <span>Code de partie</span>
+            <input id="inp-room" maxlength="4" placeholder="ABCD" style="text-transform:uppercase" />
+          </label>
+          <button id="btn-join" class="btn">Rejoindre</button>
+        </div>
+      </div>
+      <p id="menu-status" class="status"></p>
+      <p class="hint-small">Astuce : ouvre cette page dans 2 onglets — héberge dans l'un, rejoins avec le code dans l'autre.</p>
+    </div>
+  </section>
+
+  <!-- ===================== LOBBY ===================== -->
+  <section id="screen-lobby" class="screen">
+    <div class="menu-card">
+      <h2>Salon</h2>
+      <div class="code-row">
+        <span>Code : <b id="lobby-code">----</b></span>
+        <button id="lobby-copy" class="btn tiny">Copier</button>
+        <span class="mode-badge">Mode : <b id="lobby-mode">NORMAL</b></span>
+      </div>
+
+      <label class="field">
+        <span>Mode (hôte)</span>
+        <select id="lobby-mode-select">
+          <option value="photo">📸 Cache-cache photo</option>
+          <option value="normal">Normal</option>
+          <option value="infected">Infecté</option>
+        </select>
+      </label>
+
+      <!-- Réglages du mode photo (hôte) -->
+      <div id="photo-config" class="photo-config hidden">
+        <label class="field">
+          <span>Difficulté (taille du perso + camouflage + tolérance)</span>
+          <select id="photo-difficulty">
+            <option value="easy">Facile</option>
+            <option value="normal" selected>Normale</option>
+            <option value="hard">Difficile</option>
+          </select>
+        </label>
+        <label class="field">
+          <span>Scènes</span>
+          <select id="photo-sceneassign">
+            <option value="perPlayer" selected>Une scène différente par joueur</option>
+            <option value="shared">La même scène pour tous</option>
+          </select>
+        </label>
+      </div>
+
+      <div class="role-row" id="role-row">
+        <button id="role-hider" class="role-btn sel">🦎 Cacheur</button>
+        <button id="role-hunter" class="role-btn">🔴 Chasseur</button>
+      </div>
+
+      <ul id="lobby-players" class="players"></ul>
+      <p id="lobby-need" class="status"></p>
+
+      <div class="row">
+        <button id="btn-ready" class="btn">Prêt</button>
+        <button id="btn-start" class="btn primary">Démarrer</button>
+        <button id="btn-leave" class="btn ghost">Quitter</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== JEU ===================== -->
+  <section id="screen-game" class="screen">
+    <canvas id="game-canvas"></canvas>
+
+    <!-- HUD haut -->
+    <div id="hud-top" class="hud">
+      <div class="hud-pill"><span id="hud-phase">—</span> · <b id="hud-timer">00:00</b></div>
+      <div class="hud-pill" id="hud-role">🦎 CACHEUR</div>
+      <div class="hud-pill" id="hud-mode">Mode NORMAL</div>
+      <div class="hud-pill" id="hud-alive">Cacheurs en vie : 0</div>
+      <div class="hud-pill" id="hud-score">Score : 0</div>
+    </div>
+    <div id="hud-hint" class="hud-hint"></div>
+
+    <!-- Actions du cacheur (préparation ET chasse) -->
+    <div id="prep-actions" class="prep-actions hidden">
+      <button id="btn-paint" class="btn primary">🎨 Peindre (P)</button>
+      <button id="btn-lockpos" class="btn">📍 Verrou position (L)</button>
+      <button id="btn-lockrot" class="btn">🧭 Verrou orientation (R)</button>
+      <button id="btn-freecam" class="btn">🎥 Caméra libre (C)</button>
+    </div>
+
+    <!-- Écran d'attente (chasseur en préparation) -->
+    <div id="hunter-wait" class="hunter-wait hidden">
+      <div class="wait-card">
+        <h2>🔴 Tu es le CHASSEUR</h2>
+        <p>Les caméléons se cachent et se peignent. Patiente pendant la préparation.</p>
+        <p class="muted">Tu ne vois pas leurs positions (anti-triche).</p>
+        <button id="btn-survol" class="btn">Survoler la carte (flèches)</button>
+      </div>
+    </div>
+
+    <!-- Barre d'outils de peinture (dockée sur le bord gauche, mode peinture) -->
+    <div id="paint-bar" class="paint-bar hidden">
+      <div class="pb-title">🎨 Camouflage</div>
+
+      <button id="pt-eyedrop" class="pb-btn">💧 Pipette</button>
+      <p class="pb-hint">Pipette : clique sur le sol pour prélever sa couleur.</p>
+
+      <div class="pb-field">
+        <span>Couleur</span>
+        <div class="swatch-wrap">
+          <div id="pt-swatch" class="swatch"></div>
+          <input id="pt-color" type="color" value="#7fae5a" />
+        </div>
+      </div>
+
+      <div class="pb-field">
+        <span>Taille du pinceau</span>
+        <input id="pt-brush" type="range" min="3" max="48" value="16" />
+      </div>
+
+      <label class="pb-finish">
+        <span>Finition</span>
+        <input id="pt-finish" type="checkbox" />
+        <span id="pt-finishlbl">Mat</span>
+      </label>
+
+      <button id="pt-fill" class="pb-btn">Remplir</button>
+      <button id="pt-done" class="pb-btn done">✔ Terminer</button>
+      <p class="pb-hint">Peins sur ton bonhomme · molette = zoom · Échap = quitter</p>
+    </div>
+
+    <!-- Toast -->
+    <div id="toast" class="toast hidden"></div>
+
+    <!-- Fin de partie -->
+    <div id="end-overlay" class="overlay hidden">
+      <div class="end-card">
+        <h1 id="end-title">PARTIE TERMINÉE</h1>
+        <p id="end-outcome" class="muted"></p>
+        <ol id="end-ranking" class="ranking"></ol>
+        <div class="row">
+          <button id="btn-again" class="btn primary">Rejouer (hôte)</button>
+          <button id="btn-menu" class="btn ghost">Menu</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== MODE PHOTO ===================== -->
+  <section id="screen-photo" class="screen">
+    <canvas id="photo-canvas"></canvas>
+
+    <div id="photo-hud" class="hud">
+      <div class="hud-pill"><span id="photo-phase">—</span> · <b id="photo-timer">00:00</b></div>
+      <div class="hud-pill hidden" id="photo-turn-pill"></div>
+      <div class="hud-pill hidden" id="photo-tries"></div>
+      <div class="hud-pill" id="photo-score">Score : 0</div>
+    </div>
+
+    <ol id="photo-scores" class="photo-scores"></ol>
+
+    <div id="photo-hint" class="hud-hint"></div>
+
+    <!-- Barre de la phase cachette -->
+    <div id="photo-hide-bar" class="photo-hide-bar hidden">
+      <button id="photo-flip" class="btn">↔ Miroir</button>
+      <button id="photo-confirm" class="btn primary">✔ Je suis caché !</button>
+      <span id="photo-ready-count" class="ready-count"></span>
+    </div>
+
+    <!-- Bandeau de révélation -->
+    <div id="photo-reveal-banner" class="photo-reveal hidden">
+      <span id="photo-reveal-text"></span>
+    </div>
+
+    <!-- Toast local -->
+    <div id="photo-toast" class="toast hidden"></div>
+
+    <!-- Podium final -->
+    <div id="photo-end" class="overlay hidden">
+      <div class="end-card">
+        <h1>🏆 PODIUM</h1>
+        <ol id="photo-ranking" class="ranking"></ol>
+        <div class="row">
+          <button id="photo-again" class="btn primary">Rejouer (hôte)</button>
+          <button id="photo-menu" class="btn ghost">Menu</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/shared/constants.js"></script>
+  <script src="/shared/imprint.js"></script>
+  <script src="js/map.js"></script>
+  <script src="js/paint.js"></script>
+  <script src="js/game.js"></script>
+  <script src="js/photo-mode.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>

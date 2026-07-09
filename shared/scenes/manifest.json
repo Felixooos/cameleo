@@ -1,0 +1,78 @@
+{
+  "styleVersion": "STYLE-V1",
+  "edgeMargin": 0.03,
+  "scenes": [
+    {
+      "id": "autumn-leaves",
+      "file": "/scenes/autumn-leaves.webp",
+      "theme": "tapis de feuilles d'automne",
+      "difficulty": "hard"
+    },
+    {
+      "id": "beach-shells",
+      "file": "/scenes/beach-shells.webp",
+      "theme": "plage aux coquillages",
+      "difficulty": "easy"
+    },
+    {
+      "id": "hydrangea-rain",
+      "file": "/scenes/hydrangea-rain.webp",
+      "theme": "hortensias sous la pluie",
+      "difficulty": "normal"
+    },
+    {
+      "id": "jungle-foliage",
+      "file": "/scenes/jungle-foliage.webp",
+      "theme": "mur de jungle",
+      "difficulty": "hard"
+    },
+    {
+      "id": "library-shelves",
+      "file": "/scenes/library-shelves.webp",
+      "theme": "bibliotheque",
+      "difficulty": "hard"
+    },
+    {
+      "id": "market-stalls",
+      "file": "/scenes/market-stalls.webp",
+      "theme": "marche",
+      "difficulty": "normal"
+    },
+    {
+      "id": "meadow-fish-clouds",
+      "file": "/scenes/meadow-fish-clouds.webp",
+      "theme": "prairie aux nuages-poissons",
+      "difficulty": "easy"
+    },
+    {
+      "id": "night-fireflies",
+      "file": "/scenes/night-fireflies.webp",
+      "theme": "nuit aux lucioles",
+      "difficulty": "hard"
+    },
+    {
+      "id": "snowy-clearing",
+      "file": "/scenes/snowy-clearing.webp",
+      "theme": "clairiere enneigee",
+      "difficulty": "easy"
+    },
+    {
+      "id": "town-rooftops",
+      "file": "/scenes/town-rooftops.webp",
+      "theme": "toits de ville",
+      "difficulty": "normal"
+    },
+    {
+      "id": "underwater-reef",
+      "file": "/scenes/underwater-reef.webp",
+      "theme": "fonds marins",
+      "difficulty": "normal"
+    },
+    {
+      "id": "vegetable-garden",
+      "file": "/scenes/vegetable-garden.webp",
+      "theme": "potager",
+      "difficulty": "easy"
+    }
+  ]
+}
